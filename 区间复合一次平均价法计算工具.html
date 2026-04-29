@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>区间复合一次平均价法计算工具（新规则版）</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ 区间复合一次平均价法计算工具（新规则版）</h1>
+
+        <!-- 投标总价输入 -->
+        <div class="card">
+            <div class="card-title">💰 投标总价输入</div>
+            <div class="input-group">
+                <label>投标总价 (万元)：</label>
+                <input type="number" id="totalPrice" placeholder="输入投标总价，用于计算各投标人报价占比" step="0.01">
+            </div>
+            <p style="color: #666; font-size: 13px; margin-top: 10px;">
+                💡 提示：输入总价后，各投标人的报价不能超过投标总价
+            </p>
+            <p style="color: #f44336; font-size: 12px; margin-top: 5px; font-weight: bold;">
+                ⚠️ 注意：投标报价高于投标总价时，系统将拒绝计算
+            </p>
+        </div>
+
+        <!-- 参数配置 -->
+        <div class="card">
+            <div class="card-title">📋 参数配置</div>
+            <div class="params-grid">
+                <div class="param-item">
+                    <div class="param-label">区间系数 w1</div>
+                    <input type="number" id="paramW1" value="-0.15" step="0.01" 
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div class="param-item">
+                    <div class="param-label">区间系数 w2</div>
+                    <input type="number" id="paramW2" value="0.1" step="0.01"
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div class="param-item">
+                    <div class="param-label">基准价浮动系数 C</div>
+                    <input type="number" id="paramC" value="0" step="0.01"
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div class="param-item">
+                    <div class="param-label">扣分系数 n1 (≥基准价)</div>
+                    <input type="number" id="paramN1" value="1" step="0.1"
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div class="param-item">
+                    <div class="param-label">扣分系数 n2 (<基准价)</div>
+                    <input type="number" id="paramN2" value="0.5" step="0.1"
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div class="param-item">
+                    <div class="param-label">价格部分满分</div>
+                    <input type="number" id="paramMaxScore" value="100" step="1"
+                           style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 4px; font-size: 14px;">
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn btn-secondary" onclick="resetParams()" style="margin-top: 10px;">🔄 恢复默认参数</button>
+            </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="card">
+            <div class="card-title">📝 输入投标人报价</div>
+            
+            <div class="input-group" style="margin-bottom: 15px;">
+                <label>投标人数量 (M)：</label>
+                <input type="number" id="bidderCount" placeholder="输入投标人数量，如：8" min="1" onchange="generateBidderTable()">
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="result-table" id="bidderTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">序号</th>
+                            <th style="width: 150px;">投标人名称</th>
+                            <th>评标价 (万元)</th>
+                            <th style="width: 100px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bidderTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 30px; color: #999;">
+                                请先输入投标人数量，然后点击生成表格
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="generateBidderTable()">📋 生成表格</button>
+                <button class="btn btn-primary" onclick="calculate()">🚀 开始计算</button>
+                <button class="btn btn-secondary" onclick="loadExample()">📖 加载示例</button>
+                <button class="btn btn-secondary" onclick="clearAll()">🗑️ 清空</button>
+            </div>
+        </div>
+
+        <!-- 计算结果 -->
+        <div class="card" id="resultCard" style="display: none;">
+            <div class="card-title">📊 计算结果</div>
+
+            <!-- 关键结果摘要 -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 8px; color: white; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 12px; opacity: 0.9;">初始平均价 A1</div>
+                        <div style="font-size: 24px; font-weight: bold;" id="summaryA1">-</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 12px; opacity: 0.9;">合理报价区间</div>
+                        <div style="font-size: 18px; font-weight: bold;" id="summaryInterval">-</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 12px; opacity: 0.9;">基准价 Pbase</div>
+                        <div style="font-size: 24px; font-weight: bold;" id="summaryPbase">-</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                        <div style="font-size: 12px; opacity: 0.9;">有效投标人</div>
+                        <div style="font-size: 24px; font-weight: bold;" id="summaryValidCount">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最优投标价格预测 -->
+            <div class="step-box" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left-color: #4caf50;">
+                <div class="step-title" style="color: #2e7d32;">🎯 最优投标价格预测</div>
+                <div id="optimalPriceResult"></div>
+            </div>
+
+            <!-- 快速报价预测工具 -->
+            <div class="step-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-left-color: #667eea; margin-top: 20px;">
+                <div class="step-title" style="color: white;">⚡ 快速报价预测工具</div>
+                <p style="margin-bottom: 15px; color: white; opacity: 0.9;">输入您的预期报价，立即计算预计得分和最优策略</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end;">
+                    <div class="input-group">
+                        <label style="color: white;">您的报价 (万元)：</label>
+                        <input type="number" id="quickQuotePrice" placeholder="输入您的报价" step="0.01" 
+                               style="background: white; border: none; padding: 12px; font-size: 16px;">
+                    </div>
+                    <button class="btn" style="background: white; color: #667eea; font-weight: bold; font-size: 16px;" 
+                            onclick="quickPredict()">🎯 预测得分</button>
+                </div>
+
+                <div id="quickPredictResult" style="margin-top: 20px; display: none;">
+                    <!-- 快速预测结果将在这里显示 -->
+                </div>
+            </div>
+
+            <!-- 折叠的详细计算步骤 -->
+            <details style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; cursor: pointer;">
+                <summary style="font-weight: bold; color: #667eea; font-size: 16px; padding: 10px; outline: none;">
+                    📝 查看详细计算步骤
+                </summary>
+                <div style="margin-top: 15px;">
+                    <!-- 步骤 1：剔除规则 -->
+                    <div class="step-box">
+                        <div class="step-title">第 1 步：剔除极端报价</div>
+                        <div id="step1Result"></div>
+                    </div>
+
+                    <!-- 步骤 2：计算 A1 -->
+                    <div class="step-box">
+                        <div class="step-title">第 2 步：计算初始平均价 A1</div>
+                        <div id="step2Result"></div>
+                    </div>
+
+                    <!-- 步骤 3：合理报价区间 -->
+                    <div class="step-box">
+                        <div class="step-title">第 3 步：确定合理报价区间</div>
+                        <div id="step3Result"></div>
+                    </div>
+
+                    <!-- 步骤 4：筛选有效投标人 -->
+                    <div class="step-box">
+                        <div class="step-title">第 4 步：筛选"有效投标人"</div>
+                        <div id="step4Result"></div>
+                    </div>
+
+                    <!-- 步骤 5：计算 A2 -->
+                    <div class="step-box">
+                        <div class="step-title">第 5 步：计算有效投标人评标价算术平均值 A2</div>
+                        <div id="step5Result"></div>
+                    </div>
+
+                    <!-- 步骤 6：确定基准价 -->
+                    <div class="step-box">
+                        <div class="step-title">第 6 步：确定基准价 Pbase</div>
+                        <div id="step6Result"></div>
+                    </div>
+
+                    <!-- 步骤 7：计算得分 -->
+                    <div class="step-box">
+                        <div class="step-title">第 7 步：计算每个投标人价格得分</div>
+                        <div id="step7Result"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 最终结果表格 -->
+            <table class="result-table">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>投标人</th>
+                        <th>评标价 (万元)</th>
+                        <th>是否有效投标人</th>
+                        <th>与基准价差额</th>
+                        <th>扣分系数 n</th>
+                        <th>价格得分</th>
+                    </tr>
+                </thead>
+                <tbody id="resultTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 计算说明 -->
+        <div class="card">
+            <div class="card-title">📖 计算规则说明</div>
+            
+            <details style="margin-top: 10px;">
+                <summary style="font-weight: bold; color: #667eea; padding: 10px; cursor: pointer; outline: none; background: #f8f9fa; border-radius: 5px;">
+                    📋 点击展开/收起规则说明
+                </summary>
+                <div style="margin-top: 15px;">
+                    <div class="info-box">
+                        <h4>剔除规则（第 1 步）</h4>
+                        <p>根据投标人数量 M 的不同，剔除极端报价用于计算 A1：</p>
+                        <ul style="margin-top: 10px; padding-left: 20px;">
+                            <li>M ≤ 5：不剔除，直接用所有 M 个报价</li>
+                            <li>5 < M ≤ 10：去掉最高和最低各 1 个，剩余 X = M - 2</li>
+                            <li>10 < M ≤ 20：去掉最高 2 个和最低 1 个，剩余 X = M - 3</li>
+                            <li>20 < M ≤ 30：去掉最高 3 个和最低 2 个，剩余 X = M - 5</li>
+                            <li>M > 30：去掉最高 4 个和最低 3 个，剩余 X = M - 7</li>
+                        </ul>
+                        <p style="margin-top: 10px; color: #f44336;"><strong>注意：</strong>剔除仅用于计算 A1，并不否决投标人。所有投标人仍然参与后续的区间筛选和价格得分计算。</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>合理报价区间（第 3 步）</h4>
+                        <p>区间下限：A1 × (1 + w1) = A1 × 0.85</p>
+                        <p>区间上限：A1 × (1 + w2) = A1 × 1.1</p>
+                        <p><strong>注意：</strong>区间不含本数（即报价等于边界时不算在区间内）</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>有效投标人筛选（第 4 步）</h4>
+                        <p>找出所有初评合格投标人中，评标价严格在区间 (0.85A1, 1.1A1) 内的投标人。</p>
+                        <p>若至少有一个投标人满足条件，则这些投标人称为"有效投标人"。</p>
+                        <p>若无投标人满足条件，则有效投标人定义为：第 1 步中剩余的那 X 个投标人。</p>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>价格得分计算（第 7 步）</h4>
+                        <div class="formula">
+                            得分 i = 100 - 100 × n × |Pi - Pbase| / Pbase
+                        </div>
+                        <p>其中：</p>
+                        <ul style="margin-top: 5px; padding-left: 20px;">
+                            <li>若 Pi ≥ Pbase，则 n = n1 = 1</li>
+                            <li>若 Pi < Pbase，则 n = n2 = 0.5</li>
+                            <li>若计算出的得分 < 0，则取 0 分</li>
+                        </ul>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- 示例 -->
+        <div class="card example-section">
+            <div class="example-title">📖 示例说明（M=8）</div>
+            <details>
+                <summary style="cursor: pointer; color: #f57f17; font-weight: bold; padding: 10px 0;">
+                    📋 点击查看示例数据
+                </summary>
+                <div style="margin-top: 10px;">
+                    <p>假设有 8 个初评合格投标人，报价如下（单位：万元）：</p>
+                    <table class="result-table" style="margin-top: 10px;">
+                        <tr><td>投标人</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td></tr>
+                        <tr><td>报价</td><td>95</td><td>100</td><td>102</td><td>108</td><td>110</td><td>85</td><td>120</td><td>98</td></tr>
+                    </table>
+                    <p style="margin-top: 10px;"><strong>点击"加载示例"按钮可自动填充此数据。</strong></p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
